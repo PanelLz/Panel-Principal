@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Panel de Publicación LzPlay</title>
+  <style>
+    body { font-family: sans-serif; background: #f0f0f0; padding: 20px; }
+    input, button { padding: 10px; margin: 5px 0; width: 100%; }
+    .preview, .copiable { background: #fff; padding: 10px; margin-top: 10px; border: 1px solid #ccc; white-space: pre-wrap; }
+    .btn-copy { background: #008cba; color: white; cursor: pointer; margin-top: 5px; border: none; padding: 8px; }
+  </style>
+</head>
+<body>
+
+  <h2>Agregar nuevo canal</h2>
+  <div class="preview" id="preview"></div>
+
+
+  <input id="token" placeholder="Pega tu token aquí solo una vez">
+  <button onclick="guardarToken()">Guardar Token</button>
+
+  <input id="url" placeholder="URL del canal">
+  <input id="img" placeholder="URL de la imagen">
+  <input id="title" placeholder="Título del canal">
+
+  <button onclick="generarCodigo()">Generar</button>
+  <button onclick="publicar()">Publicar</button>
+
+  <div class="preview" id="preview"></div>
+
+
+<h3>🔗 Unir API</h3>
+  <button onclick="generarParte1()" class="btn-copy">🧩 Parte 1 - Copiar</button>
+  <div class="copiable" id="parte1"></div>
+
+  <button onclick="generarParte2()" class="btn-copy">🧩 Parte 2 - Copiar</button>
+  <div class="copiable" id="parte2"></div>
+  <script>
+    const repo = 'LzRdrgz0001/streamLzPlay';
+    const path = 'index.html';
+    let generatedCode = '';
+
+    // Mostrar si ya hay token guardado
+    window.onload = () => {
+      const savedToken = localStorage.getItem('github_token');
+      if (savedToken) {
+        document.getElementById('token').placeholder = 'Token guardado ✔';
+        document.getElementById('token').disabled = true;
+      }
+    };
+
+    function guardarToken() {
+      const input = document.getElementById('token');
+      const token = input.value.trim();
+      if (!token) return alert('Pega tu token');
+      localStorage.setItem('github_token', token);
+      input.value = '';
+      input.placeholder = 'Token guardado ✔';
+      input.disabled = true;
+      alert('Token guardado correctamente');
+    }
+
+    function generarCodigo() {
+      const url = document.getElementById('url').value.trim();
+      const img = document.getElementById('img').value.trim();
+      const title = document.getElementById('title').value.trim();
+
+      if (!url || !img || !title) return alert('Completa todos los campos');
+
+      const uniqueKey = `link_${url}_${img}_${title}`;
+      if (localStorage.getItem(uniqueKey)) {
+        alert('Este código ya fue generado');
+        return;
+      }
+
+      generatedCode = `
+<a href="${url}" class="item">
+  <img src="${img}" alt="${title}">
+  <div class="item-title">${title}</div>
+</a>`.trim();
+
+      localStorage.setItem(uniqueKey, generatedCode);
+      document.getElementById('preview').innerText = generatedCode;
+    }
+
+    async function publicar() {
+      const token = localStorage.getItem('github_token');
+      if (!token) return alert('No hay token guardado. Pégalo primero.');
+
+      if (!generatedCode) return alert('Primero genera el código');
+
+      const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const data = await res.json();
+      const sha = data.sha;
+      const content = atob(data.content);
+
+      const insertIndex = content.indexOf('<!--PEGAR ABAJO-->');
+      if (insertIndex === -1) return alert('Etiqueta <!--PEGAR ABAJO--> no encontrada');
+
+      const updatedContent =
+        content.slice(0, insertIndex + '<!--PEGAR ABAJO-->'.length) +
+        '\n' + generatedCode +
+        content.slice(insertIndex + '<!--PEGAR ABAJO-->'.length);
+
+      const response = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          message: `Agregar nuevo canal: ${generatedCode}`,
+          content: btoa(unescape(encodeURIComponent(updatedContent))),
+          sha: sha
+        })
+      });
+
+      if (response.ok) {
+        alert('Publicado correctamente');
+      } else {
+        alert('Error al publicar');
+        console.error(await response.json());
+      }
+    }
+	
+	  function generarParte1() {
+      const parte1 = `ghp_86iCQEr6GUWReTZtS`.trim();
+      mostrarYCopiar('parte1', parte1);
+    }
+
+    function generarParte2() {
+      const parte2 = `SvVW42GRQMpxf15CkDB`.trim();
+      mostrarYCopiar('parte2', parte2);
+    }
+
+    function mostrarYCopiar(id, texto) {
+      const div = document.getElementById(id);
+      div.innerText = texto;
+
+      // Copiar automáticamente al hacer clic en el botón
+      navigator.clipboard.writeText(texto).then(() => {
+        alert(`${id === 'parte1' ? 'Parte 1' : 'Parte 2'} copiada al portapapeles`);
+      }).catch(() => {
+        alert('No se pudo copiar automáticamente. Copia manualmente.');
+      });
+    }
+  </script>
+
+</body>
+</html>
